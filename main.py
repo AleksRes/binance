@@ -2,6 +2,7 @@ from binance.client import Client
 import keys
 import pandas as pd
 import time
+import re
 
 client = Client(keys.api_key, keys.api_secret)
 
@@ -41,14 +42,35 @@ def check_stepSize(asset, qty):
     """Проверка на корректный шаг покупки. И его исправление, если он не корректный."""
     info = client.get_symbol_info(asset)
     stepSize = float(info['filters'][2]['stepSize'])
-
-    if qty > stepSize and qty % stepSize == 0:
+    print(f'qty = {qty}, stepSize = {stepSize}')
+    if qty < stepSize:
+        print('stepSize - FAIL')
+        return False
+    if qty >= stepSize and stepSize >= 1.0:
+        qty -= int(qty % stepSize)
+        print('steSize - OK')
+        return True
+    elif get_count(qty) <= get_count(stepSize):
+        round(qty, get_count(qty))
+        print('stepSize - OK')
+        return True
+    elif get_count(qty) > get_count(stepSize):
+        round(qty, get_count(stepSize))
         print('steSize - OK')
         return True
     else:
         print('stepSize - FAIL')
         print(f'qty = {qty}, stepSize = {stepSize}. residue = {qty % stepSize}')
         return False
+
+def get_count(number):
+    s = str(number)
+    if '.' in s:
+        return int(len(re.search(r'(?<=\.)\d+', s)[0]))
+    elif 'e-' in s:
+        return int(re.search(r'\d$', s)[0])
+    else:
+        return 0
 
 def check_minNotional(asset, buy_amt):
     info = client.get_symbol_info(asset)
@@ -106,8 +128,9 @@ def strategy(buy_amt, SL=0.985, Target=1.02, open_position=False):
 
     qty = round(buy_amt*0.999/df.Close.iloc[-1], 2)
     print(((df.Close.pct_change() + 1).cumprod()).iloc[-1])
-    print('Searching possible orders...')
+    print(f'Searching possible orders... for {qty} coins')
     checked, qty_to_work = check_order_possibility(buy_amt, asset, qty, df)
+    print(checked, qty_to_work, ((df.Close.pct_change() + 1).cumprod()).iloc[-1])
 
     if ((df.Close.pct_change() + 1).cumprod()).iloc[-1] > 1 & checked is True:
         order = client.create_order(symbol=asset, side='BUY', type='MARKET', quantity=qty_to_work)
@@ -139,12 +162,10 @@ def strategy(buy_amt, SL=0.985, Target=1.02, open_position=False):
         time.sleep(2)
 
 
-while True:
-    strategy(20)
-"""
+#while True:
+#    strategy(20)
+
 i=0
 while i < 1:
-    print(check_stepSize('PEOPLEUSDT', 837.38))
-    tick_sized_qty = tick_sized('PEOPLEUSDT', 837.38)
-    print(f'Corrected qty = {tick_sized_qty}\nstepSize - OK')
-    i = 1"""
+    print(get_count(1232.245))
+    i = 1
